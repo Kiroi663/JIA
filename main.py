@@ -244,7 +244,7 @@ class JobBot:
             )
             msg = await event.respond(
                 template,
-                buttons=[[Button.url("📝 Postuler", job.get("url", "#"))],
+                buttons=[Button.url("📝 Postuler", job.get("url", "#"))],
                 parse_mode='md'
             )
             state["message_ids"].append(msg.id)
