@@ -17,6 +17,7 @@ class JobBot:
         self._initialized = False
         self.bot = None
         self.mongo_client = None
+        self.db = None
         self.jobs_collection = None
         self.user_favorites = None
         
@@ -59,7 +60,8 @@ class JobBot:
             "jobfinder_session",
             offreBot.API_ID,
             offreBot.API_HASH
-        ).start(bot_token=offreBot.TELEGRAM_BOT_TOKEN)
+        )
+        await self.bot.start(bot_token=offreBot.TELEGRAM_BOT_TOKEN)
 
         # Connexion à MongoDB
         self.mongo_client = AsyncIOMotorClient(offreBot.MONGO_URI)
@@ -75,6 +77,7 @@ class JobBot:
 
     def setup_handlers(self):
         """Configuration des handlers Telethon"""
+
         @self.bot.on(events.NewMessage(pattern='/start'))
         async def start_handler(event):
             await self.handle_start(event)
@@ -172,6 +175,14 @@ class JobBot:
             await event.edit(message, buttons=buttons, parse_mode='md')
         else:
             await event.respond(message, buttons=buttons, parse_mode='md')
+
+    async def verify_membership(self, event):
+        """Vérifie si l'utilisateur a rejoint le groupe"""
+        if await self.is_group_member(event.sender_id):
+            user = await event.get_sender()
+            await self.show_welcome(event, user)
+        else:
+            await event.answer("❌ Vous n'avez pas rejoint le groupe", alert=True)
 
     async def show_categories(self, event):
         """Affiche les catégories disponibles"""
@@ -285,6 +296,84 @@ class JobBot:
         )
         state["message_ids"].append(footer.id)
 
+    async def handle_pagination(self, event):
+        """Gère la pagination"""
+        chat_id = event.chat_id
+        if chat_id not in self.user_states:
+            return
+
+        page_num = int(event.data.decode().split('_')[1])
+        self.user_states[chat_id]["current_page"] = page_num
+        await self.send_job_page(event, chat_id)
+
+    async def show_main_menu(self, event):
+        """Affiche le menu principal"""
+        await self.show_welcome(event, await event.get_sender())
+
+    async def quit_category(self, event):
+        """Quitte la vue des catégories"""
+        chat_id = event.chat_id
+        if chat_id in self.user_states:
+            if self.user_states[chat_id].get("message_ids"):
+                await self.bot.delete_messages(chat_id, self.user_states[chat_id]["message_ids"])
+            del self.user_states[chat_id]
+        await self.show_main_menu(event)
+
+    async def show_favorites(self, event):
+        """Affiche les favoris de l'utilisateur"""
+        user_id = event.sender_id
+        favorites = await self.user_favorites.find_one({"user_id": user_id})
+        
+        if not favorites or not favorites.get("categories"):
+            await event.answer("⭐ Vous n'avez pas encore de favoris", alert=True)
+            return
+
+        buttons = []
+        for category in favorites["categories"]:
+            buttons.append([Button.inline(
+                f"🔹 {category}",
+                f"category_{category}"
+            )])
+        
+        buttons.append([Button.inline("🔙 Retour", "show_main_menu")])
+        
+        await event.edit(
+            "⭐ Vos catégories favorites :",
+            buttons=buttons,
+            parse_mode='md'
+        )
+
+    async def toggle_favorite_category(self, event):
+        """Ajoute/retire une catégorie des favoris"""
+        category = event.data.decode().split('_', 2)[2]
+        user_id = event.sender_id
+        
+        favorites = await self.user_favorites.find_one({"user_id": user_id})
+        
+        if not favorites:
+            await self.user_favorites.insert_one({
+                "user_id": user_id,
+                "categories": [category]
+            })
+            await event.answer(f"⭐ {category} ajouté aux favoris", alert=True)
+        else:
+            if category in favorites["categories"]:
+                await self.user_favorites.update_one(
+                    {"user_id": user_id},
+                    {"$pull": {"categories": category}}
+                )
+                await event.answer(f"❌ {category} retiré des favoris", alert=True)
+            else:
+                await self.user_favorites.update_one(
+                    {"user_id": user_id},
+                    {"$push": {"categories": category}}
+                )
+                await event.answer(f"⭐ {category} ajouté aux favoris", alert=True)
+
+    async def show_advanced_search(self, event):
+        """Affiche la recherche avancée"""
+        await event.answer("🔍 Fonctionnalité en développement", alert=True)
+
     async def run_bot(self):
         """Point d'entrée principal du bot"""
         await self.initialize()
@@ -362,7 +451,10 @@ def add_job():
         return True
 
     try:
-        asyncio.run(async_add_job())
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(async_add_job())
+        loop.close()
         return jsonify({"message": "Offre ajoutée avec succès"}), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
