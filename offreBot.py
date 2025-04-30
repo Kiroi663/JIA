@@ -3,7 +3,7 @@ DEBUG = True  # Mettre à False en production
 
 # Version du bot
 VERSION = "1.0.0"
-TELEGRAM_BOT_TOKEN = "7532881306:AAEWQHmhnrPDd6EpB1mfd3bdX8NIhOGvfZk"
+TELEGRAM_BOT_TOKEN = "7705448449:AAE1OWgd3ENAomhOLHcXsS8IEyZ2H-ZFeqQ"
 API_ID = "25426984"
 API_HASH = "7d8d92cee8b7411879b472dcd36bfdab"
 MONGO_URI = "mongodb://claudelAI:claudelAI@cluster0-shard-00-00.w0t3l.mongodb.net:27017,cluster0-shard-00-01.w0t3l.mongodb.net:27017/?ssl=true&replicaSet=atlas-irbkta-shard-0&authSource=admin&retryWrites=true&w=majority&appName=Cluster0"
