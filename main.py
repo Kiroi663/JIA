@@ -138,7 +138,7 @@ class JobBot:
         if await self.is_group_member(event.sender_id):
             await self.show_welcome(event, user)
         else:
-            await self.request_join_group(event, user)
+            await self.show_welcome(event, user)
 
     async def show_welcome(self, event, user):
         """Affiche le message de bienvenue"""
