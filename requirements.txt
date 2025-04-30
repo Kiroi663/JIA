@@ -1,0 +1,5 @@
+Flask
+telethon
+motor
+pymongo
+python-dotenv
